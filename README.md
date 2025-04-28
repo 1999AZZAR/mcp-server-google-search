@@ -1,9 +1,7 @@
 # MCP Server: Google Programmable Search Engine
 
-[![Build Status](https://github.com/1999AZZAR/mcp-server-google-search/actions/workflows/ci.yml/badge.svg)](https://github.com/1999AZZAR/mcp-server-google-search/actions)
 [![npm version](https://img.shields.io/npm/v/google-search-mcp?color=blue)](https://www.npmjs.com/package/google-search-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Downloads](https://img.shields.io/npm/dm/google-search-mcp.svg)](https://www.npmjs.com/package/google-search-mcp)
 
 A simple, MCP-compatible server that proxies requests to Google's Programmable Search Engine (Custom Search API) and returns structured JSON results.
 

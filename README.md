@@ -34,7 +34,7 @@ The MCP Server for Google Programmable Search Engine serves as a microservice pl
 - ✅ **HTTP Endpoints**: `/health`, `/`, `/search`, `/filters`, `/tools`, `/metrics`, and `/docs` (Swagger UI).
 - 🔒 **Redis Caching**: TTL-based cache with LRU in-memory fallback and stale-while-revalidate.
 - 📊 **Prometheus Metrics**: Exposed at `/metrics` for monitoring.
-- ⚡️ **Rate Limiting**: Default 60 requests/minute (configurable).
+- ⚡️ **Rate Limiting**: Default 30 requests/minute (configurable).
 - 🛠️ **Structured Logging**: JSON logging with [Pino](https://github.com/pinojs/pino).
 - 🚀 **Hot Reload**: Development mode with live code reload.
 - ⚙️ **Easy Integration**: Preconfigured for Claude Desktop via `mcp_config.json`.
@@ -65,9 +65,8 @@ GOOGLE_API_KEY=your_api_key_here
 GOOGLE_CSE_ID=your_cse_id_here
 PORT=3000                           # defaults to 3000
 REDIS_URL=redis://localhost:6379    # optional
-RATE_LIMIT_WINDOW_MS=60000          # optional, default 60000ms
-RATE_LIMIT_MAX_REQUESTS=60          # optional, default 60
-CACHE_TTL_SECONDS=300               # optional, default 300s
+RATE_LIMIT_MAX=30                   # optional, default 30
+CACHE_TTL=3600                      # optional, default 3600s
 ```
 
 | Variable                 | Description                                     | Required | Default        |
@@ -76,9 +75,8 @@ CACHE_TTL_SECONDS=300               # optional, default 300s
 | `GOOGLE_CSE_ID`          | Custom Search Engine ID                         | Yes      | –              |
 | `PORT`                   | HTTP port                                       | No       | `3000`         |
 | `REDIS_URL`              | Redis connection URL                            | No       | –              |
-| `RATE_LIMIT_WINDOW_MS`   | Rate-limit window in ms                         | No       | `60000`        |
-| `RATE_LIMIT_MAX_REQUESTS`| Max requests per window                         | No       | `60`           |
-| `CACHE_TTL_SECONDS`      | Cache TTL in seconds                            | No       | `300`          |
+| `RATE_LIMIT_MAX`         | Max requests per window                         | No       | `30`           |
+| `CACHE_TTL`              | Cache TTL in seconds                            | No       | `3600`         |
 
 ## Running the Server
 
@@ -91,12 +89,7 @@ Default base URL: `http://localhost:${PORT}`
 
 ### GET /health
 
-Returns `200 OK` if the server is healthy.
-
-**Response**:
-```json
-{ "status": "ok" }
-```
+Returns `200 OK` with no content if the server is healthy.
 
 ### GET /
 
@@ -105,6 +98,17 @@ Root endpoint for initialization checks.
 **Response**:
 ```json
 { "status": "ok" }
+```
+
+### GET /ready
+
+Readiness check verifying Redis and Google API connectivity.
+
+**Responses**:
+- `200 OK`: All services healthy
+- `503 Service Unavailable`: One or more checks failed
+```json
+{ "redis": "ok"|"failed"|"disabled", "google": "ok"|"failed" }
 ```
 
 ### GET /search
@@ -160,11 +164,11 @@ console.log(data.items);
 
 - **Redis** as primary cache (configured via `REDIS_URL`)
 - **LRU in-memory** fallback cache
-- **Stale-while-revalidate** strategy controlled by `CACHE_TTL_SECONDS`
+- **Stale-while-revalidate** strategy controlled by `CACHE_TTL`
 
 ## Rate Limiting
 
-- Controlled via `RATE_LIMIT_WINDOW_MS` & `RATE_LIMIT_MAX_REQUESTS`
+- Controlled via `RATE_LIMIT_MAX`
 - Response headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
 
 ## Error Handling
@@ -217,7 +221,7 @@ Restart Claude Desktop and enable the `google-search` MCP provider.
 
 - **Missing API Key**: verify `GOOGLE_API_KEY` in `.env`
 - **Redis Errors**: ensure Redis is running and `REDIS_URL` is correct
-- **Rate Limit**: adjust `RATE_LIMIT_MAX_REQUESTS` & `RATE_LIMIT_WINDOW_MS`
+- **Rate Limit**: adjust `RATE_LIMIT_MAX`
 - **SSL Issues**: check network and certificate configurations
 
 ## Contributing

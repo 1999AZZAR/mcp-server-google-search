@@ -5,7 +5,9 @@
     "rootDir": ".",
     "outDir": "dist",
     "esModuleInterop": true,
-    "strict": true
+    "strict": true,
+    "moduleResolution": "node",
+    "skipLibCheck": true
   },
-  "include": ["index.ts"]
+  "include": ["index.ts", "global.d.ts"]
 }

@@ -4,6 +4,12 @@ A simple MCP-compatible server that proxies requests to Google Custom Search (Pr
 
 ## Features
 - Exposes multiple HTTP endpoints for search, filters, and tools.
+- Structured JSON logging with Pino.
+- Swagger UI documentation at `/docs`.
+- Prometheus metrics exposed at `/metrics`.
+- Redis caching with LRU in-memory fallback and stale-while-revalidate.
+- Rate limiting to throttle abuse.
+- Health (`/health`) and root (`/`) endpoints for initialization checks.
 - Fetches data from the Google Custom Search API.
 - Returns the raw JSON response from Google.
 - Supports caching with Redis.
@@ -43,9 +49,13 @@ By default the server listens on `http://localhost:<PORT>`. Override via `PORT`.
 
 ## API Usage
 ### Endpoints
+- GET `/health`   : returns 200 OK.
+- GET `/`        : returns `{ status: 'ok' }`.
 - GET `/search?q=...` : perform a search with optional filters.
 - GET `/filters`     : list available filters and descriptions.
 - GET `/tools`       : list tool schemas and parameters.
+- GET `/metrics`      : Prometheus metrics in text format.
+- GET `/docs`         : Swagger UI for interactive API docs.
 
 #### Search Endpoint
 ```

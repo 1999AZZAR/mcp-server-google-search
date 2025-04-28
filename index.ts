@@ -5,10 +5,23 @@ import bodyParser from 'body-parser';
 import axios from 'axios';
 import rateLimit from 'express-rate-limit';
 import { createClient } from 'redis';
+import pino from 'pino';
+import pinoHttp from 'pino-http';
+import { collectDefaultMetrics, Counter, Histogram, register } from 'prom-client';
+import { default as LRUCache } from 'lru-cache';
+import swaggerUi from 'swagger-ui-express';
+
+const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+collectDefaultMetrics();
+const searchCounter = new Counter({ name: 'search_requests_total', help: 'Total search requests' });
+const cacheHitCounter = new Counter({ name: 'cache_hits_total', help: 'Cache hits' });
+const cacheMissCounter = new Counter({ name: 'cache_misses_total', help: 'Cache misses' });
+const requestDuration = new Histogram({ name: 'search_request_duration_seconds', help: 'Search request latency in seconds', buckets: [0.1,0.5,1,2,5] });
+const lruCache = new LRUCache({ max: parseInt(process.env.LRU_CACHE_SIZE || '500', 10) });
 
 // Ensure required env vars
 if (!process.env.GOOGLE_API_KEY || !process.env.GOOGLE_CSE_ID) {
-  console.error('Missing GOOGLE_API_KEY or GOOGLE_CSE_ID in .env');
+  logger.error('Missing GOOGLE_API_KEY or GOOGLE_CSE_ID in .env');
   process.exit(1);
 }
 const API_KEY = process.env.GOOGLE_API_KEY!;
@@ -24,7 +37,7 @@ const redisClient = createClient({
     reconnectStrategy: () => new Error('Redis unavailable')
   }
 });
-redisClient.on('error', err => console.error('Redis Client Error', err));
+redisClient.on('error', err => logger.error('Redis Client Error', err));
 
 // Toggle caching based on Redis connectivity
 let cacheEnabled = true;
@@ -32,16 +45,44 @@ let cacheEnabled = true;
 async function main() {
   try {
     await redisClient.connect();
-    console.log('Connected to Redis');
+    logger.info('Connected to Redis');
   } catch (err) {
-    console.warn('Redis connection failed, caching disabled', err);
+    logger.warn('Redis connection failed, caching disabled', err);
     cacheEnabled = false;
     // Disconnect to stop any retry attempts
     redisClient.disconnect().catch(() => {});
   }
 
   const app = express();
+  app.use(pinoHttp({ logger }));
+
+  // Health check for MCP initialization
+  app.get('/health', (_req: Request, res: Response) => res.sendStatus(200));
+  // Root endpoint
+  app.get('/', (_req: Request, res: Response) => res.json({status: 'ok'}));
   app.use(bodyParser.json());
+
+  // Swagger UI documentation
+  const swaggerSpec = {
+    openapi: '3.0.0',
+    info: { title: 'Google Search MCP', version: '1.0.0' },
+    servers: [{ url: `http://localhost:${process.env.PORT||3000}` }],
+    paths: {
+      '/health': { get: { summary: 'Health Check', responses: { '200': { description: 'OK' } } } },
+      '/': { get: { summary: 'Root', responses: { '200': { description: 'OK' } } } },
+      '/search': { get: { summary: 'Search endpoint', parameters: [{ name: 'q', in: 'query', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'OK' } } } },
+      '/filters': { get: { summary: 'Filters list', responses: { '200': { description: 'OK' } } } },
+      '/tools': { get: { summary: 'Tools list', responses: { '200': { description: 'OK' } } } },
+      '/metrics': { get: { summary: 'Prometheus metrics', responses: { '200': { description: 'Metrics', content: { 'text/plain': { schema: { type: 'string' } } } } } } }
+    }
+  };
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+  // Metrics endpoint
+  app.get('/metrics', async (_req, res) => {
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  });
 
   // Rate limiting
   const WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10);
@@ -70,6 +111,8 @@ async function main() {
 
   // Search endpoint with caching
   app.get('/search', async (req: Request, res: Response) => {
+    searchCounter.inc();
+    const end = requestDuration.startTimer();
     const q = req.query.q as string | undefined;
     if (!q) return res.status(400).json({ error: 'Query param q is required' });
     const params: Record<string, string> = { key: API_KEY, cx: CSE_ID, q };
@@ -82,23 +125,45 @@ async function main() {
       if (cacheEnabled) {
         try {
           const cached = await redisClient.get(cacheKey);
-          if (cached) return res.json(JSON.parse(cached));
-        } catch (err) {
-          console.warn('Redis GET failed, skipping cache', err);
-        }
+          if (cached) {
+            cacheHitCounter.inc();
+            res.json(JSON.parse(cached));
+            end();
+            // background refresh
+            void (async () => {
+              try {
+                const resp = await axios.get('https://www.googleapis.com/customsearch/v1', { params });
+                await redisClient.set(cacheKey, JSON.stringify(resp.data), { EX: CACHE_TTL });
+              } catch (e) { logger.warn('Background refresh failed', e); }
+            })();
+            return;
+          }
+        } catch (e) { logger.warn('Redis GET failed', e); }
       }
+      // fallback LRU cache
+      const cachedLRU = lruCache.get(cacheKey);
+      if (cachedLRU) {
+        cacheHitCounter.inc();
+        res.json(cachedLRU);
+        end();
+        void (async () => {
+          try {
+            const resp = await axios.get('https://www.googleapis.com/customsearch/v1', { params });
+            lruCache.set(cacheKey, resp.data);
+          } catch (e) { logger.warn('Background refresh failed', e); }
+        })();
+        return;
+      }
+      cacheMissCounter.inc();
       const response = await axios.get('https://www.googleapis.com/customsearch/v1', { params });
-      if (cacheEnabled) {
-        try {
-          await redisClient.set(cacheKey, JSON.stringify(response.data), { EX: CACHE_TTL });
-        } catch (err) {
-          console.warn('Redis SET failed, skipping cache write', err);
-        }
-      }
-      return res.json(response.data);
+      if (cacheEnabled) await redisClient.set(cacheKey, JSON.stringify(response.data), { EX: CACHE_TTL });
+      else lruCache.set(cacheKey, response.data);
+      res.json(response.data);
+      end();
     } catch (err) {
-      console.error(err);
+      logger.error('Search error', err);
       return res.status(500).json({ error: (err as Error).toString() });
+      end();
     }
   });
 
@@ -124,10 +189,10 @@ async function main() {
   });
 
   const port = parseInt(process.env.PORT || '3000', 10);
-  app.listen(port, () => console.log(`Server listening on http://localhost:${port}`));
+  app.listen(port, () => logger.info(`Server listening on http://localhost:${port}`));
 }
 
 main().catch(err => {
-  console.error('Failed to start', err);
+  logger.error('Failed to start', err);
   process.exit(1);
 });

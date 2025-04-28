@@ -8,7 +8,7 @@ import { createClient } from 'redis';
 import pino from 'pino';
 import pinoHttp from 'pino-http';
 import { collectDefaultMetrics, Counter, Histogram, register } from 'prom-client';
-import { default as LRUCache } from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 import swaggerUi from 'swagger-ui-express';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });

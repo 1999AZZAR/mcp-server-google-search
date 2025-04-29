@@ -22,3 +22,5 @@ coverage/
 #dist
 dist/
 
+# Package lock  
+package-lock.json

@@ -186,7 +186,48 @@ List supported filters.
 
 ### GET /tools
 
-List available tool descriptions (e.g. `search`).
+List available tool descriptions.
+```json
+{
+  "tools": [
+    {
+      "name": "search",
+      "method": "GET",
+      "path": "/search",
+      "description": "Perform a Google Custom Search with optional filters",
+      "parameters": {
+        "q": "string",
+        "searchType": "string",
+        "fileType": "string",
+        "siteSearch": "string",
+        "dateRestrict": "string",
+        "safe": "string",
+        "exactTerms": "string",
+        "excludeTerms": "string",
+        "sort": "string",
+        "gl": "string",
+        "hl": "string",
+        "num": "string",
+        "start": "string"
+      }
+    },
+    {
+      "name": "searchFileType",
+      "method": "GET",
+      "path": "/search",
+      "description": "Search only specific file types",
+      "parameters": { "q": "string", "fileType": "string" }
+    },
+    {
+      "name": "searchAndExtract",
+      "method": "GET",
+      "path": "/search-and-extract",
+      "description": "Perform a search then extract main content from results",
+      "parameters": { "q": "string", "extract": "boolean" }
+    }
+  ]
+}
+```
 
 ### GET /metrics
 

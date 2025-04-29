@@ -255,11 +255,7 @@ const gqlQuery = new GraphQLObjectType({
     filters: { type: new GraphQLList(GraphQLString), resolve: () => VALID_FILTERS },
     tools: {
       type: GraphQLJSON,
-      resolve: () => {
-        const params: Record<string, string> = { q: 'string' };
-        VALID_FILTERS.forEach(f => { params[f] = 'string'; });
-        return { tools: [{ name: 'search', method: 'GET', path: '/search', description: 'Google Custom Search', parameters: params }] };
-      }
+      resolve: () => ({ tools: TOOLS_INFO })
     }
   }
 });
@@ -271,6 +267,23 @@ const apolloServer = new ApolloServer({
 });
 
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Tool definitions
+const TOOLS_INFO = [
+  {
+    name: 'search', method: 'GET', path: '/search',
+    description: 'Perform a Google Custom Search with optional filters',
+    parameters: { q: 'string', searchType: 'string', fileType: 'string', siteSearch: 'string', dateRestrict: 'string', safe: 'string', exactTerms: 'string', excludeTerms: 'string', sort: 'string', gl: 'string', hl: 'string', num: 'string', start: 'string' }
+  },
+  {
+    name: 'searchFileType', method: 'GET', path: '/search',
+    description: 'Search only specific file types', parameters: { q: 'string', fileType: 'string' }
+  },
+  {
+    name: 'searchAndExtract', method: 'GET', path: '/search-and-extract',
+    description: 'Perform a search then extract main content from results', parameters: { q: 'string', extract: 'boolean' }
+  }
+] as const;
 
 // Validation schema
 const VALID_FILTERS = ['searchType', 'fileType', 'siteSearch', 'dateRestrict', 'safe', 'exactTerms', 'excludeTerms', 'sort', 'gl', 'hl', 'num', 'start'] as const;
@@ -325,10 +338,7 @@ app.get('/search', validateSearchQuery, wrapAsync(async (req, res) => {
   res.json(resp.data); end();
 }));
 app.get('/filters', (_req, res) => res.json({ filters: VALID_FILTERS.map(f => ({ name: f })) }));
-app.get('/tools', (_req, res) => {
-  const params: Record<string, string> = { q: 'string' }; VALID_FILTERS.forEach(f => params[f] = 'string');
-  res.json({ tools: [{ name: 'search', method: 'GET', path: '/search', description: 'Google Custom Search', parameters: params }] });
-});
+app.get('/tools', (_req, res) => res.json({ tools: TOOLS_INFO }));
 app.get('/metrics', async (_req, res) => { res.set('Content-Type', register.contentType); res.end(await register.metrics()); });
 
 // App initializer

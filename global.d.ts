@@ -8,3 +8,5 @@ declare module 'axios-retry';
 declare module 'express-graphql';
 declare module 'graphql';
 declare module 'graphql-type-json';
+declare module 'cheerio';
+declare module 'sentiment';

@@ -15,9 +15,12 @@ import CircuitBreaker from 'opossum';
 import { v4 as uuidv4 } from 'uuid';
 import config from './config';
 import { ApolloServer } from 'apollo-server-express';
-import { GraphQLSchema, GraphQLObjectType, GraphQLString, GraphQLList, GraphQLNonNull } from 'graphql';
+import { GraphQLSchema, GraphQLObjectType, GraphQLString, GraphQLList, GraphQLNonNull, GraphQLBoolean } from 'graphql';
 import GraphQLJSON from 'graphql-type-json';
 import { ApolloServerPluginLandingPageLocalDefault } from 'apollo-server-core';
+import cheerio from 'cheerio';
+import Sentiment from 'sentiment';
+import { printSchema } from 'graphql/utilities';
 
 declare global {
   namespace Express {
@@ -80,7 +83,7 @@ function errorHandler(err: any, req: Request, res: Response, next: NextFunction)
 // Swagger setup
 const swaggerSpec = {
   openapi: '3.0.0',
-  info: { title: 'Google Search MCP', version: '1.0.0' },
+  info: { title: 'Google Search MCP', version: '1.0.0', externalDocs: { description: 'GraphQL SDL', url: `http://localhost:${config.PORT}/graphql/schema` } },
   servers: [{ url: `http://localhost:${config.PORT}` }],
   paths: {
     '/health': {
@@ -220,6 +223,30 @@ const swaggerSpec = {
           '200': { description: 'GraphiQL interactive UI' }
         }
       }
+    },
+    '/graphql/schema': {
+      get: {
+        summary: 'GraphQL schema (SDL)',
+        responses: {
+          '200': {
+            description: 'GraphQL schema SDL',
+            content: { 'text/plain': { schema: { type: 'string' } } }
+          }
+        }
+      }
+    },
+    '/extract': {
+      get: {
+        summary: 'Extract endpoint',
+        parameters: [
+          { name: 'url', in: 'query', required: true, schema: { type: 'string' } }
+        ],
+        responses: {
+          '200': { description: 'Extracted content', content: { 'application/json': { schema: { type: 'object' } } } },
+          '400': { description: 'Invalid query', content: { 'application/json': { schema: { type: 'object' } } } },
+          '500': { description: 'Internal server error', content: { 'application/json': { schema: { type: 'object' } } } }
+        }
+      }
     }
   }
 };
@@ -252,6 +279,34 @@ const gqlQuery = new GraphQLObjectType({
         return data;
       }
     },
+    searchFileType: {
+      type: GraphQLJSON,
+      args: {
+        q: { type: new GraphQLNonNull(GraphQLString) },
+        fileType: { type: new GraphQLNonNull(GraphQLString) }
+      },
+      resolve: async (_src: unknown, args: Record<string, unknown>): Promise<any> => {
+        const params = { key: config.GOOGLE_API_KEY, cx: config.GOOGLE_CSE_ID, q: args.q as string, fileType: args.fileType as string };
+        const { data } = await searchBreaker.fire(params);
+        return data;
+      }
+    },
+    extract: {
+      type: GraphQLJSON,
+      args: { url: { type: new GraphQLNonNull(GraphQLString) } },
+      resolve: async (_src: unknown, args: Record<string, unknown>): Promise<any> => {
+        const url = args.url as string;
+        try {
+          const html = (await axios.get(url)).data;
+          const $ = cheerio.load(html);
+          const main = $('main').text() || $('body').text();
+          const score = sentiment.analyze(main).score;
+          return { extracted: main, sentiment: score };
+        } catch {
+          throw new Error('Extraction failed');
+        }
+      }
+    },
     filters: { type: new GraphQLList(GraphQLString), resolve: () => VALID_FILTERS },
     tools: {
       type: GraphQLJSON,
@@ -260,13 +315,19 @@ const gqlQuery = new GraphQLObjectType({
   }
 });
 const gqlSchema = new GraphQLSchema({ query: gqlQuery });
+const graphqlSDL = printSchema(gqlSchema);
 const apolloServer = new ApolloServer({
   schema: gqlSchema,
   introspection: true,
-  plugins: [ApolloServerPluginLandingPageLocalDefault()],
+  plugins: [ApolloServerPluginLandingPageLocalDefault],
 });
 
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// GraphQL SDL endpoint for Swagger UI
+app.get('/graphql/schema', (req, res) => {
+  res.type('text/plain').send(graphqlSDL);
+});
 
 // Tool definitions
 const TOOLS_INFO = [
@@ -276,12 +337,12 @@ const TOOLS_INFO = [
     parameters: { q: 'string', searchType: 'string', fileType: 'string', siteSearch: 'string', dateRestrict: 'string', safe: 'string', exactTerms: 'string', excludeTerms: 'string', sort: 'string', gl: 'string', hl: 'string', num: 'string', start: 'string' }
   },
   {
-    name: 'searchFileType', method: 'GET', path: '/search',
+    name: 'searchFileType', method: 'GET', path: '/search-file-type',
     description: 'Search only specific file types', parameters: { q: 'string', fileType: 'string' }
   },
   {
-    name: 'searchAndExtract', method: 'GET', path: '/search-and-extract',
-    description: 'Perform a search then extract main content from results', parameters: { q: 'string', extract: 'boolean' }
+    name: 'extract', method: 'GET', path: '/extract',
+    description: 'Extract main content and sentiment from a URL', parameters: { url: 'string' }
   }
 ] as const;
 
@@ -302,6 +363,9 @@ function validateSearchQuery(req: Request, res: Response, next: NextFunction) {
   req.query = result.data;
   next();
 }
+
+// Sentiment analyzer for extraction
+const sentiment = new Sentiment();
 
 // Routes
 app.get('/health', (_req, res) => res.sendStatus(200));
@@ -336,6 +400,25 @@ app.get('/search', validateSearchQuery, wrapAsync(async (req, res) => {
   cacheMissCounter.inc(); const resp = await searchBreaker.fire(params);
   if (cacheEnabled) await redisClient.set(cacheKey, JSON.stringify(resp.data), { EX: config.CACHE_TTL }); else lruCache.set(cacheKey, resp.data);
   res.json(resp.data); end();
+}));
+app.get('/search-file-type', wrapAsync(async (req, res) => {
+  const q = String(req.query.q || ''); const fileType = String(req.query.fileType || '');
+  if (!q || !fileType) return res.status(400).json({ code: 400, message: 'Missing q or fileType' });
+  const { data } = await searchBreaker.fire({ key: config.GOOGLE_API_KEY, cx: config.GOOGLE_CSE_ID, q, fileType });
+  return res.json(data);
+}));
+app.get('/extract', wrapAsync(async (req, res) => {
+  const url = String(req.query.url || '');
+  if (!url) return res.status(400).json({ code: 400, message: 'Missing url parameter' });
+  try {
+    const html = (await axios.get(url)).data;
+    const $ = cheerio.load(html);
+    const main = $('main').text() || $('body').text();
+    const score = sentiment.analyze(main).score;
+    return res.json({ extracted: main, sentiment: score });
+  } catch {
+    return res.status(500).json({ code: 500, message: 'Extraction failed' });
+  }
 }));
 app.get('/filters', (_req, res) => res.json({ filters: VALID_FILTERS.map(f => ({ name: f })) }));
 app.get('/tools', (_req, res) => res.json({ tools: TOOLS_INFO }));

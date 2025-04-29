@@ -10,7 +10,7 @@ A microservice for Google Custom Search with caching, rate-limiting, metrics, an
 - Prometheus metrics endpoint (`/metrics`)
 - Rate limiting via `express-rate-limit`
 - Swagger UI documentation (`/docs`)
-- REST endpoints: `/health`, `/ready`, `/`, `/search`, `/filters`, `/tools`, `/metrics`
+- REST endpoints: `/health`, `/ready`, `/`, `/search`, `/search-file-type`, `/extract`, `/filters`, `/tools`, `/metrics`
 - Unit tests with Jest + Supertest
 - ESLint + TypeScript linting
 - GraphQL endpoint (`/graphql`) with Apollo Server Sandbox UI
@@ -97,6 +97,16 @@ curl http://localhost:3000/filters
 curl http://localhost:3000/tools
 ```
 
+**Search by file type**
+```bash
+curl "http://localhost:3000/search-file-type?q=openai&fileType=pdf"
+```
+
+**Extract**
+```bash
+curl "http://localhost:3000/extract?url=https://example.com"
+```
+
 **Metrics**
 ```bash
 curl http://localhost:3000/metrics
@@ -107,6 +117,11 @@ Visit `http://localhost:3000/docs`
 
 **GraphQL (UI)**
 Visit Apollo Sandbox at `http://localhost:3000/graphql`
+
+**GraphQL Schema (SDL)**
+```bash
+curl http://localhost:3000/graphql/schema
+```
 
 **GraphQL (Query)**
 ```bash
@@ -180,6 +195,25 @@ Perform a Google Custom Search.
 
 **Response**: JSON from Google API.
 
+### GET /search-file-type
+
+Search only specific file types.
+
+**Query Parameters**:
+- `q` (string, required): search query
+- `fileType` (string, required): file type
+
+**Response**: JSON from Google API.
+
+### GET /extract
+
+Extract main content and sentiment from a URL.
+
+**Query Parameters**:
+- `url` (string, required): URL to extract
+
+**Response**: JSON with extracted content and sentiment.
+
 ### GET /filters
 
 List supported filters.
@@ -214,16 +248,16 @@ List available tool descriptions.
     {
       "name": "searchFileType",
       "method": "GET",
-      "path": "/search",
+      "path": "/search-file-type",
       "description": "Search only specific file types",
       "parameters": { "q": "string", "fileType": "string" }
     },
     {
-      "name": "searchAndExtract",
+      "name": "extract",
       "method": "GET",
-      "path": "/search-and-extract",
-      "description": "Perform a search then extract main content from results",
-      "parameters": { "q": "string", "extract": "boolean" }
+      "path": "/extract",
+      "description": "Extract main content and sentiment from a URL",
+      "parameters": { "url": "string" }
     }
   ]
 }

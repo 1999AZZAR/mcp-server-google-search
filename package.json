@@ -28,7 +28,9 @@
     "cors": "^2.8.5",
     "graphql": "^16.7.1",
     "apollo-server-express": "^3.11.1",
-    "graphql-type-json": "^0.3.0"
+    "graphql-type-json": "^0.3.0",
+    "cheerio": "^1.0.0-rc.12",
+    "sentiment": "^5.0.2"
   },
   "devDependencies": {
     "typescript": "^5.1.3",

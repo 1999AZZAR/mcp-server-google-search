@@ -9,5 +9,5 @@
     "moduleResolution": "node",
     "skipLibCheck": true
   },
-  "include": ["index.ts", "global.d.ts"]
+  "include": ["index.ts", "global.d.ts", "app.ts", "config.ts", "__tests__/**/*.ts"]
 }

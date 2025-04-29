@@ -5,3 +5,6 @@ declare module 'lru-cache';
 declare module 'swagger-ui-express';
 declare module 'opossum';
 declare module 'axios-retry';
+declare module 'express-graphql';
+declare module 'graphql';
+declare module 'graphql-type-json';

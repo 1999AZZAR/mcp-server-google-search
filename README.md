@@ -1,185 +1,130 @@
-# MCP Server: Google Programmable Search Engine
+# Google Search MCP Server
 
-[![npm version](https://img.shields.io/npm/v/google-search-mcp?color=blue)](https://www.npmjs.com/package/google-search-mcp)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-
-A simple, MCP-compatible server that proxies requests to Google's Programmable Search Engine (Custom Search API) and returns structured JSON results.
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Running the Server](#running-the-server)
-- [API Reference](#api-reference)
-- [Usage Examples](#usage-examples)
-- [Logging & Monitoring](#logging--monitoring)
-- [Caching](#caching)
-- [Rate Limiting](#rate-limiting)
-- [Error Handling](#error-handling)
-- [Deployment](#deployment)
-- [Integrating with Claude Desktop](#integrating-with-claude-desktop)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
-
-## Overview
-
-The MCP Server for Google Programmable Search Engine serves as a microservice plugin (MCP) for Claude Desktop or any client supporting MCP. It accepts HTTP requests, forwards them to Google’s Custom Search API, applies caching, logging, rate limiting, and metrics, then returns the raw JSON response in a developer-friendly format.
+A microservice for Google Custom Search with caching, rate-limiting, metrics, and robust error handling.
 
 ## Features
 
-- ✅ **HTTP Endpoints**: `/health`, `/`, `/search`, `/filters`, `/tools`, `/metrics`, and `/docs` (Swagger UI).
-- 🔒 **Redis Caching**: TTL-based cache with LRU in-memory fallback and stale-while-revalidate.
-- 📊 **Prometheus Metrics**: Exposed at `/metrics` for monitoring.
-- ⚡️ **Rate Limiting**: Default 30 requests/minute (configurable).
-- 🛠️ **Structured Logging**: JSON logging with [Pino](https://github.com/pinojs/pino).
-- 🚀 **Hot Reload**: Development mode with live code reload.
-- ⚙️ **Easy Integration**: Preconfigured for Claude Desktop via `mcp_config.json`.
+- Centralized error handling middleware
+- Config validation via Zod (fail-fast)
+- Redis + LRU caching with stale-while-revalidate
+- Prometheus metrics endpoint (`/metrics`)
+- Rate limiting via `express-rate-limit`
+- Swagger UI documentation (`/docs`)
+- REST endpoints: `/health`, `/ready`, `/`, `/search`, `/filters`, `/tools`, `/metrics`
+- Unit tests with Jest + Supertest
+- ESLint + TypeScript linting
+- GraphQL endpoint (`/graphql`) with Apollo Server Sandbox UI
 
-## Prerequisites
+## Quickstart
 
-- **Node.js** v14 or higher
-- **npm** v6 or higher
-- **Google API Key** with Custom Search API enabled
-- **Google Custom Search Engine ID (CSE ID)**
-- **Redis** instance (optional, recommended for caching)
+### Prerequisites
 
-## Installation
+- Node.js >= v14
+- npm >= v6
+- Google API Key with Custom Search API enabled
+- Google CSE ID
+- Redis instance (optional)
+
+### Installation
 
 ```bash
-git clone https://github.com/1999AZZAR/mcp-server-google-search.git
+git clone https://github.com/azzar/mcp-server-google-search.git
 cd mcp-server-google-search
 npm install
-npm run build
+cp .env.example .env
 ```
 
-## Configuration
+### Configuration
 
-Create a `.env` file in the project root:
-
+Edit `.env` to set:
 ```ini
-GOOGLE_API_KEY=your_api_key_here
-GOOGLE_CSE_ID=your_cse_id_here
-PORT=3000                           # defaults to 3000
-REDIS_URL=redis://localhost:6379    # optional
-RATE_LIMIT_MAX=30                   # optional, default 30
-CACHE_TTL=3600                      # optional, default 3600s
+GOOGLE_API_KEY=your_api_key
+GOOGLE_CSE_ID=your_cse_id
+PORT=3000
+REDIS_URL=redis://localhost:6379
+CACHE_TTL=3600
+LRU_CACHE_SIZE=500
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=30
+CB_TIMEOUT_MS=5000
+CB_ERROR_THRESHOLD=50
+CB_RESET_TIMEOUT_MS=30000
+LOG_LEVEL=info
 ```
 
-| Variable                 | Description                                     | Required | Default        |
-|--------------------------|-------------------------------------------------|----------|----------------|
-| `GOOGLE_API_KEY`         | Google API key for Custom Search                | Yes      | –              |
-| `GOOGLE_CSE_ID`          | Custom Search Engine ID                         | Yes      | –              |
-| `PORT`                   | HTTP port                                       | No       | `3000`         |
-| `REDIS_URL`              | Redis connection URL                            | No       | –              |
-| `RATE_LIMIT_MAX`         | Max requests per window                         | No       | `30`           |
-| `CACHE_TTL`              | Cache TTL in seconds                            | No       | `3600`         |
+Alternatively, adjust settings directly in `config.ts` for advanced use.
 
-## Running the Server
+### Running in Development
 
-- **Production**: `npm start`
-- **Development**: `npm run dev`  (hot reload)
-
-Default base URL: `http://localhost:${PORT}`
-
-## API Reference
-
-### GET /health
-
-Returns `200 OK` with no content if the server is healthy.
-
-### GET /
-
-Root endpoint for initialization checks.
-
-**Response**:
-```json
-{ "status": "ok" }
-```
-
-### GET /ready
-
-Readiness check verifying Redis and Google API connectivity.
-
-**Responses**:
-- `200 OK`: All services healthy
-- `503 Service Unavailable`: One or more checks failed
-```json
-{ "redis": "ok"|"failed"|"disabled", "google": "ok"|"failed" }
-```
-
-### GET /search
-
-Perform a Google Custom Search.
-
-**Query Parameters**:
-| Name | Type   | Required | Description          |
-|------|--------|----------|----------------------|
-| `q`  | string | yes      | URL-encoded query    |
-
-**Example**:
 ```bash
-curl "http://localhost:3000/search?q=weather+today"
+npm run dev
+```
+- Live reload with ts-node
+- Swagger UI available at `http://localhost:3000/docs`
+- GraphQL Sandbox UI available at `http://localhost:3000/graphql`
+
+### Running in Production
+
+```bash
+npm run build
+npm start
 ```
 
-**Response**: raw JSON from Google API (`items`, `searchInformation`, etc.).
+### API Usage Examples
 
-### GET /filters
-
-Lists available filter options and descriptions.
-
-### GET /tools
-
-Lists tool schemas and parameters.
-
-### GET /metrics
-
-Prometheus metrics in text format.
-
-### GET /docs
-
-Interactive Swagger UI documentation.
-
-## Usage Examples
-
-**Node.js (axios)**
-```js
-import axios from 'axios';
-
-const { data } = await axios.get('http://localhost:3000/search', {
-  params: { q: 'openai chatgpt' }
-});
-console.log(data.items);
+**Health Check**
+```bash
+curl http://localhost:3000/health
 ```
 
-## Logging & Monitoring
+**Readiness**
+```bash
+curl http://localhost:3000/ready
+```
 
-- **Pino** for high-performance JSON logging
-- **Prometheus** counters & histograms for request timings, cache hits/misses, and errors
+**Search**
+```bash
+curl "http://localhost:3000/search?q=openai&safe=active"
+```
 
-## Caching
+**Filters**
+```bash
+curl http://localhost:3000/filters
+```
 
-- **Redis** as primary cache (configured via `REDIS_URL`)
-- **LRU in-memory** fallback cache
-- **Stale-while-revalidate** strategy controlled by `CACHE_TTL`
+**Tools**
+```bash
+curl http://localhost:3000/tools
+```
 
-## Rate Limiting
+**Metrics**
+```bash
+curl http://localhost:3000/metrics
+```
 
-- Controlled via `RATE_LIMIT_MAX`
-- Response headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+**Swagger UI**
+Visit `http://localhost:3000/docs`
 
-## Error Handling
+**GraphQL (UI)**
+Visit Apollo Sandbox at `http://localhost:3000/graphql`
 
-- **400 Bad Request**: missing `q` parameter
-- **500 Internal Server Error**: Google API errors or unexpected failures
-- Error format: `{ "error": "description" }`
+**GraphQL (Query)**
+```bash
+curl -X POST http://localhost:3000/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ search(q:\"openai\") }"}'
+```
 
-## Deployment
+### Testing & Linting
+
+```bash
+npm run lint
+npm test
+```
 
 ### Docker
+
+**Dockerfile**
 ```dockerfile
 FROM node:16-alpine
 WORKDIR /app
@@ -188,51 +133,83 @@ RUN npm install --production
 CMD ["npm", "start"]
 ```
 
+**Build & Run**
 ```bash
 docker build -t mcp-google-search .
-docker run -e GOOGLE_API_KEY=$GOOGLE_API_KEY \
-           -e GOOGLE_CSE_ID=$GOOGLE_CSE_ID \
-           -p 3000:3000 mcp-google-search
+docker run -d -p 3000:3000 --env-file .env mcp-google-search
 ```
 
-## Integrating with Claude Desktop
+## Environment Variables
 
-Add to `~/.claude-desktop/mcp_config.json`:
-```json
-{
-  "mcpServers": {
-    "google-search": {
-      "command": "node",
-      "args": ["--directory","/path/to/google-search","dist/index.js"],
-      "env": {
-        "GOOGLE_API_KEY": "YOUR_API_KEY",
-        "GOOGLE_CSE_ID": "YOUR_CSE_ID",
-        "PORT": "4000",
-        "REDIS_URL": "redis://localhost:6379"
-      }
-    }
-  }
-}
+| Variable                 | Description                                | Default                     |
+|--------------------------|--------------------------------------------|-----------------------------|
+| `GOOGLE_API_KEY`         | Google API key                             | (required)                  |
+| `GOOGLE_CSE_ID`          | Custom Search Engine ID                    | (required)                  |
+| `PORT`                   | HTTP port                                  | `3000`                      |
+| `REDIS_URL`              | Redis connection URL                       | `redis://localhost:6379`    |
+| `CACHE_TTL`              | Redis cache TTL (seconds)                  | `3600`                      |
+| `LRU_CACHE_SIZE`         | Fallback LRU cache max entries             | `500`                       |
+| `RATE_LIMIT_WINDOW_MS`   | Rate limit window (ms)                     | `60000`                     |
+| `RATE_LIMIT_MAX`         | Max requests per window                    | `30`                        |
+| `CB_TIMEOUT_MS`          | Circuit breaker timeout (ms)               | `5000`                      |
+| `CB_ERROR_THRESHOLD`     | Circuit breaker error threshold (%)        | `50`                        |
+| `CB_RESET_TIMEOUT_MS`    | Circuit breaker reset timeout (ms)         | `30000`                     |
+| `LOG_LEVEL`              | Pino log level                             | `info`                      |
+
+## API Reference
+
+### GET /health
+
+Liveness probe. Returns `200 OK`.
+
+### GET /ready
+
+Readiness probe. Checks Redis & Google API reachability. Returns `200 OK` or `503 Service Unavailable` with JSON `{ checks: {...} }`.
+
+### GET /
+
+Root endpoint. Returns JSON `{ status: 'ok' }`.
+
+### GET /search
+
+Perform a Google Custom Search.
+
+**Query Parameters**:
+- `q` (string, required): search query
+- Optional filters: `searchType`, `fileType`, `siteSearch`, `dateRestrict`, `safe`, `exactTerms`, `excludeTerms`, `sort`, `gl`, `hl`, `num`, `start`
+
+**Response**: JSON from Google API.
+
+### GET /filters
+
+List supported filters.
+
+### GET /tools
+
+List available tool descriptions (e.g. `search`).
+
+### GET /metrics
+
+Prometheus metrics in plain text.
+
+### GET /graphql
+
+GraphQL interactive UI (Apollo Server Sandbox).
+
+### POST /graphql
+
+GraphQL endpoint. Accepts JSON `{ "query": "<GraphQL Query>" }` and returns JSON response.
+
+## Testing
+
+Run unit tests and coverage:
+
+```bash
+npm test
 ```
 
-Restart Claude Desktop and enable the `google-search` MCP provider.
-
-## Troubleshooting
-
-- **Missing API Key**: verify `GOOGLE_API_KEY` in `.env`
-- **Redis Errors**: ensure Redis is running and `REDIS_URL` is correct
-- **Rate Limit**: adjust `RATE_LIMIT_MAX`
-- **SSL Issues**: check network and certificate configurations
-
-## Contributing
-
-1. Fork the repo
-2. Create a branch: `git checkout -b feat/your-feature`
-3. Commit your changes: `git commit -m "feat: description of change"`
-4. Push & open a Pull Request
-
-Please follow the [Conventional Commits](https://www.conventionalcommits.org/) spec.
+Coverage report in `coverage/`.
 
 ## License
 
-MIT 
+MIT

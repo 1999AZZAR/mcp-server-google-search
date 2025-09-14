@@ -10,6 +10,7 @@ A comprehensive Model Context Protocol (MCP) server that provides advanced Googl
 - **Multi-Site Search**: Search across multiple websites simultaneously with detailed statistics
 - **News Monitoring**: Monitor news sources with topic filtering and date restrictions
 - **Academic Research**: Specialized tools for finding academic papers and research documents
+- **Content Summarization**: Intelligent summarization of multiple URLs with sentiment analysis and insights
 - **MCP Compatible**: Seamlessly integrates with any MCP-compatible AI client (Claude, Cursor, etc.)
 - **Robust Error Handling**: Comprehensive error handling for API failures, rate limiting, and invalid parameters
 - **TypeScript**: Fully typed with Zod schema validation for all parameters
@@ -140,7 +141,7 @@ echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"google_sea
 
 ## Available Tools
 
-This MCP server provides **6 powerful tools** for comprehensive search and research capabilities:
+This MCP server provides **9 powerful tools** for comprehensive search, research, fact verification, and advanced research assistance:
 
 ### 1. Google Search (`google_search`)
 
@@ -148,7 +149,6 @@ Perform advanced web searches with extensive filtering options and geographic ta
 
 **Parameters:**
 - `q` (required): Search query string
-- `searchType` (optional): Type of search - "image", "news", "video", "web"
 - `fileType` (optional): File type filter - "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "rtf"
 - `siteSearch` (optional): Search within a specific site (e.g., "example.com")
 - `dateRestrict` (optional): Date restriction - "d1", "w1", "m1", "y1", "d7", "w2", "m2", "y2", "m6", "y"
@@ -456,6 +456,361 @@ Search academic papers and research documents from specialized academic sources 
   }
 }
 ```
+
+### 7. Content Summarizer (`content_summarizer`)
+
+Extract and summarize content from multiple URLs with intelligent summarization, sentiment analysis, and comprehensive insights.
+
+**Parameters:**
+- `urls` (required): Array of URLs to summarize (1-10 URLs)
+- `maxLength` (optional): Maximum length of summary per URL in words (50-500, default: 200)
+- `includeSentiment` (optional): Include sentiment analysis for each URL (default: true)
+- `focusAreas` (optional): Specific areas to focus on in summaries (e.g., ["key points", "conclusions", "data"])
+- `generateOverallSummary` (optional): Generate an overall summary combining all URLs (default: true)
+
+**Use Cases:**
+- Research summarization across multiple sources
+- Content analysis and comparison
+- News aggregation and analysis
+- Academic paper summarization
+- Competitive intelligence gathering
+- Content curation and insights
+
+**Example:**
+```json
+{
+  "name": "content_summarizer",
+  "arguments": {
+    "urls": [
+      "https://example.com/article1",
+      "https://example.com/article2",
+      "https://example.com/article3"
+    ],
+    "maxLength": 150,
+    "includeSentiment": true,
+    "focusAreas": ["key insights", "conclusions", "data"],
+    "generateOverallSummary": true
+  }
+}
+```
+
+**Response Format:**
+```json
+{
+  "urls": ["https://example.com/article1", "https://example.com/article2"],
+  "maxLength": 150,
+  "includeSentiment": true,
+  "focusAreas": ["key insights", "conclusions"],
+  "generateOverallSummary": true,
+  "summaries": [
+    {
+      "url": "https://example.com/article1",
+      "title": "Article Title",
+      "summary": "Key insights from the article...",
+      "wordCount": 1250,
+      "sentiment": {
+        "score": 0.8,
+        "comparative": 0.15,
+        "positive": ["excellent", "innovative"],
+        "negative": ["challenging"]
+      },
+      "extractionTime": "2024-01-15T10:30:00.000Z"
+    }
+  ],
+  "overallSummary": "Combined insights from all articles...",
+  "statistics": {
+    "totalUrls": 2,
+    "successfulExtractions": 2,
+    "failedExtractions": 0,
+    "averageWordCount": 1250,
+    "sentimentDistribution": {
+      "positive": 1,
+      "negative": 0,
+      "neutral": 1
+    }
+  }
+}
+```
+
+### 8. Fact Checker (`fact_checker`)
+
+Verify claims by searching multiple authoritative sources with credibility analysis and evidence extraction.
+
+**Parameters:**
+- `claim` (required): The claim or statement to verify (minimum 10 characters)
+- `sources` (optional): Specific authoritative sources to check (e.g., ["wikipedia.org", "bbc.com", "reuters.com"])
+- `confidenceThreshold` (optional): Minimum confidence level for verification (0.0-1.0, default: 0.7)
+- `timeframe` (optional): Time range for search results - "d1", "d7", "m1", "m6", "y1", "y2" (default: "y1")
+- `maxResults` (optional): Maximum results per source (1-5, default: 3)
+- `includeEvidence` (optional): Include extracted evidence snippets (default: true)
+
+**Default Sources:**
+- wikipedia.org, bbc.com, reuters.com, ap.org
+- factcheck.org, snopes.com, politifact.com
+- scholar.google.com, pubmed.ncbi.nlm.nih.gov, nature.com
+
+**Use Cases:**
+- Fact verification and debunking misinformation
+- Research validation across multiple sources
+- News verification and credibility assessment
+- Academic claim verification
+- Public statement fact-checking
+- Scientific claim validation
+
+**Example:**
+```json
+{
+  "name": "fact_checker",
+  "arguments": {
+    "claim": "The Earth is approximately 4.5 billion years old",
+    "sources": ["wikipedia.org", "science.org", "nature.com"],
+    "confidenceThreshold": 0.8,
+    "timeframe": "y1",
+    "maxResults": 2,
+    "includeEvidence": true
+  }
+}
+```
+
+**Response Format:**
+```json
+{
+  "claim": "The Earth is approximately 4.5 billion years old",
+  "sourcesToCheck": ["wikipedia.org", "science.org", "nature.com"],
+  "confidenceThreshold": 0.8,
+  "timeframe": "y1",
+  "maxResults": 2,
+  "includeEvidence": true,
+  "verification": {
+    "status": "verified",
+    "confidence": 0.85,
+    "evidenceCount": 4,
+    "supportingSources": ["wikipedia.org", "science.org"],
+    "disputingSources": [],
+    "neutralSources": ["nature.com"]
+  },
+  "sources": [
+    {
+      "source": "wikipedia.org",
+      "resultCount": 2,
+      "totalAvailable": "3700",
+      "results": [
+        {
+          "title": "Age of Earth - Wikipedia",
+          "link": "https://en.wikipedia.org/wiki/Age_of_Earth",
+          "snippet": "The age of Earth is estimated to be 4.54 ± 0.05 billion years...",
+          "displayLink": "en.wikipedia.org",
+          "relevanceScore": 0.8
+        }
+      ],
+      "credibilityScore": 0.8
+    }
+  ],
+  "evidence": [
+    {
+      "source": "wikipedia.org",
+      "url": "https://en.wikipedia.org/wiki/Age_of_Earth",
+      "title": "Age of Earth - Wikipedia",
+      "evidence": "The age of Earth is estimated to be 4.54 ± 0.05 billion years. This age represents the final stages of Earth's accretion and planetary differentiation.",
+      "relevanceScore": 0.8,
+      "sentiment": {
+        "score": 0,
+        "comparative": 0
+      }
+    }
+  ],
+  "statistics": {
+    "totalSourcesChecked": 3,
+    "successfulSearches": 3,
+    "failedSearches": 0,
+    "totalResults": 6,
+    "averageRelevanceScore": 0.75
+  }
+}
+```
+
+**Verification Statuses:**
+- `verified`: Claim is supported by credible sources with high confidence
+- `disputed`: Claim is contradicted by credible sources
+- `unverified`: Insufficient evidence or conflicting information
+- `unknown`: No relevant information found
+
+### 9. Research Assistant (`research_assistant`)
+
+Comprehensive research assistant with multi-step workflows, source synthesis, and structured report generation.
+
+**Parameters:**
+- `researchTopic` (required): The main research topic or question to investigate (minimum 10 characters)
+- `researchType` (optional): Type of research to conduct - "academic", "news", "factual", "comprehensive" (default: "comprehensive")
+- `depth` (optional): Research depth level - "quick", "standard", "deep" (default: "standard")
+- `sources` (optional): Specific sources to include in research (max 15 sources)
+- `excludeSources` (optional): Sources to exclude from research (max 10 sources)
+- `timeframe` (optional): Time range for research results - "d1", "d7", "m1", "m6", "y1", "y2" (default: "y1")
+- `maxSourcesPerType` (optional): Maximum sources per source type (2-8, default: 5)
+- `includeCitations` (optional): Include detailed citations and source tracking (default: true)
+- `generateReport` (optional): Generate structured research report (default: true)
+- `focusAreas` (optional): Specific areas to focus research on (e.g., ["methodology", "findings", "implications"])
+
+**Research Types & Source Categories:**
+- **Academic**: Academic journals, educational institutions, research repositories
+- **News**: News sources, fact checkers, international media
+- **Factual**: Government sources, scientific institutions, reference materials
+- **Comprehensive**: All source types for thorough research
+
+**Use Cases:**
+- Academic research and literature reviews
+- Market research and competitive analysis
+- Policy research and government analysis
+- Scientific research and evidence synthesis
+- Business intelligence and strategic planning
+- News analysis and media monitoring
+- Fact-checking and verification workflows
+
+**Example:**
+```json
+{
+  "name": "research_assistant",
+  "arguments": {
+    "researchTopic": "artificial intelligence impact on healthcare",
+    "researchType": "comprehensive",
+    "depth": "standard",
+    "maxSourcesPerType": 3,
+    "focusAreas": ["methodology", "findings", "implications"],
+    "includeCitations": true,
+    "generateReport": true,
+    "timeframe": "y1"
+  }
+}
+```
+
+**Response Format:**
+```json
+{
+  "researchTopic": "artificial intelligence impact on healthcare",
+  "researchType": "comprehensive",
+  "depth": "standard",
+  "timeframe": "y1",
+  "maxSourcesPerType": 3,
+  "includeCitations": true,
+  "generateReport": true,
+  "focusAreas": ["methodology", "findings", "implications"],
+  "researchWorkflow": {
+    "phase": "completed",
+    "stepsCompleted": 5,
+    "totalSteps": 5,
+    "currentStep": "Research completed"
+  },
+  "sourceCategories": ["Academic", "News", "Government", "Reference", "Specialized"],
+  "findings": [
+    {
+      "source": "nature.com",
+      "category": "Academic",
+      "url": "https://example.com/article",
+      "title": "AI in Healthcare Research",
+      "content": "Full extracted content...",
+      "wordCount": 1250,
+      "sentiment": {
+        "score": 0.8,
+        "comparative": 0.15
+      },
+      "relevanceScore": 0.9,
+      "keyInsights": ["AI shows promise in diagnostic accuracy", "Implementation challenges remain"],
+      "focusAnalysis": {
+        "methodology": ["Randomized controlled trials", "Machine learning algorithms"],
+        "findings": ["Improved diagnostic accuracy by 15%", "Reduced false positives"],
+        "implications": ["Potential for widespread adoption", "Need for regulatory framework"]
+      },
+      "contentQualityScore": 0.85,
+      "extractionTime": "2024-01-15T10:30:00.000Z"
+    }
+  ],
+  "sources": [
+    {
+      "source": "nature.com",
+      "category": "Academic",
+      "resultCount": 3,
+      "totalAvailable": "150",
+      "results": [
+        {
+          "title": "AI in Healthcare Research",
+          "link": "https://example.com/article",
+          "snippet": "Artificial intelligence is transforming healthcare...",
+          "displayLink": "nature.com",
+          "relevanceScore": 0.9
+        }
+      ],
+      "credibilityScore": 0.9
+    }
+  ],
+  "citations": [
+    {
+      "title": "AI in Healthcare Research",
+      "url": "https://example.com/article",
+      "source": "nature.com",
+      "category": "Academic",
+      "credibilityScore": 0.9,
+      "relevanceScore": 0.9,
+      "accessedDate": "2024-01-15T10:30:00.000Z"
+    }
+  ],
+  "synthesis": {
+    "keyFindings": [
+      "AI demonstrates significant potential in healthcare diagnostics",
+      "Implementation faces regulatory and technical challenges",
+      "Patient outcomes show measurable improvement with AI assistance"
+    ],
+    "conflictingInformation": [],
+    "consensusPoints": [
+      "AI technology shows promise in healthcare applications",
+      "Regulatory frameworks need development for safe implementation"
+    ],
+    "gapsInKnowledge": [
+      "Long-term impact studies are limited",
+      "Cost-benefit analysis needs more research"
+    ],
+    "confidenceLevel": 0.85
+  },
+  "report": {
+    "title": "Research Report: artificial intelligence impact on healthcare",
+    "executiveSummary": "This research analyzed 15 sources across 5 categories...",
+    "methodology": "Research methodology involved systematic search...",
+    "findings": "Key findings from the research:\n1. AI shows promise...",
+    "synthesis": "Synthesis of findings reveals 2 consensus points...",
+    "recommendations": "High confidence in findings. Recommendations can be made...",
+    "limitations": "Research limitations include: limited to publicly available sources...",
+    "citations": [...],
+    "metadata": {
+      "generatedAt": "2024-01-15T10:30:00.000Z",
+      "researchType": "comprehensive",
+      "depth": "standard",
+      "totalSources": 15,
+      "confidenceLevel": 0.85,
+      "qualityScore": 0.82
+    }
+  },
+  "statistics": {
+    "totalSourcesSearched": 15,
+    "successfulSearches": 14,
+    "failedSearches": 1,
+    "totalResults": 45,
+    "averageCredibilityScore": 0.87,
+    "researchQualityScore": 0.82
+  }
+}
+```
+
+**Research Workflow Phases:**
+1. **Multi-source Research**: Systematic search across categorized sources
+2. **Content Analysis**: Extraction, sentiment analysis, and focus area analysis
+3. **Synthesis**: Cross-reference analysis and consensus identification
+4. **Citation Management**: Automated citation generation and tracking
+5. **Report Generation**: Structured research report with executive summary
+
+**Quality Metrics:**
+- **Research Quality Score**: Composite score based on source diversity, credibility, and findings quality
+- **Confidence Level**: Overall confidence in research findings based on source agreement
+- **Source Diversity**: Number of different source categories included
+- **Content Quality**: Assessment of extracted content relevance and depth
 
 ## Development
 

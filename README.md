@@ -121,6 +121,99 @@ Extract main content and analyze sentiment from a web page.
 }
 ```
 
+#### 3. Search Analytics (`search_analytics`)
+
+Analyze search trends and get insights from multiple search queries.
+
+**Parameters:**
+- `queries` (required): Array of search queries to analyze (1-5 queries)
+- `timeRange` (optional): Time range for trend analysis - "week", "month", "year"
+- `maxResults` (optional): Maximum results per query (1-5)
+
+**Example:**
+```json
+{
+  "name": "search_analytics",
+  "arguments": {
+    "queries": ["artificial intelligence", "machine learning", "deep learning"],
+    "timeRange": "month",
+    "maxResults": 3
+  }
+}
+```
+
+#### 4. Multi-Site Search (`multi_site_search`)
+
+Search across multiple specific websites simultaneously.
+
+**Parameters:**
+- `query` (required): Search query
+- `sites` (required): Array of websites to search (1-5 sites)
+- `maxResults` (optional): Max results per site (1-5)
+- `fileType` (optional): File type to search for
+
+**Example:**
+```json
+{
+  "name": "multi_site_search",
+  "arguments": {
+    "query": "react tutorial",
+    "sites": ["github.com", "stackoverflow.com", "medium.com"],
+    "maxResults": 3
+  }
+}
+```
+
+#### 5. News Monitor (`news_monitor`)
+
+Monitor news and get alerts for specific topics.
+
+**Parameters:**
+- `topic` (required): Topic to monitor
+- `sources` (optional): Array of news sources to monitor
+- `language` (optional): Language code (e.g., "en", "es")
+- `country` (optional): Country code (e.g., "us", "uk")
+- `maxResults` (optional): Maximum results to return (1-10)
+- `dateRestrict` (optional): Date restriction for news
+
+**Example:**
+```json
+{
+  "name": "news_monitor",
+  "arguments": {
+    "topic": "artificial intelligence",
+    "sources": ["bbc.com", "cnn.com", "reuters.com"],
+    "dateRestrict": "d7",
+    "maxResults": 5
+  }
+}
+```
+
+#### 6. Academic Search (`academic_search`)
+
+Search academic papers and research documents.
+
+**Parameters:**
+- `query` (required): Research query
+- `fileType` (optional): File type (PDF only)
+- `dateRange` (optional): Publication date range
+- `sites` (optional): Academic sites to search
+- `maxResults` (optional): Maximum results to return (1-10)
+
+**Example:**
+```json
+{
+  "name": "academic_search",
+  "arguments": {
+    "query": "machine learning algorithms",
+    "fileType": "pdf",
+    "dateRange": "y1",
+    "sites": ["arxiv.org", "scholar.google.com"],
+    "maxResults": 5
+  }
+}
+```
+
 ## Development
 
 ### Running in Development Mode

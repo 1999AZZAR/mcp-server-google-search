@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "google-search": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-server-google-search/dist/index.js"],
+      "env": {
+        "GOOGLE_API_KEY": "your_google_api_key_here",
+        "GOOGLE_CSE_ID": "your_custom_search_engine_id_here"
+      }
+    }
+  }
+}
